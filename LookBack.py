@@ -12,6 +12,7 @@ class LookBack():
     def setCode(self,y_code,x_code):
         ''' 载入2个比较的股票代码 '''
         self.y_coll = self.db['day_'+y_code]
+        self.yb_coll = self.db['bonus_'+y_code]
         self.x_coll = self.db['day_'+x_code]
         self.xb_coll= self.db['bonus_'+x_code]
         self.y_x_coll = self.db['lb_'+y_code+'_'+x_code]
@@ -22,8 +23,8 @@ class LookBack():
         else:
             self.rate = 0
         return self.rate
-    def getBonus(self,start_day,end_day):
-        xb_doc = self.xb_coll.find({"_id":{'$gte':start_day,'$lte':end_day}})
+    def getBonus(self,coll,start_day,end_day):
+        xb_doc = coll.find({"_id":{'$gte':start_day,'$lte':end_day}})
         dict_line = {}
         for line in xb_doc :
             dict_line[line["_id"]] = line['bonus']
@@ -42,13 +43,17 @@ class LookBack():
         fund_copies = 0
         total_amt = 0
 
-        dict_bonus = self.getBonus(start_day,end_day)
+        dict_bonus = self.getBonus(self.xb_coll,start_day,end_day)
+        dict_y_bonus = self.getBonus(self.yb_coll,start_day,end_day)
 
         for line in y_doc :
             if day_ss=="-1":
                 day_ss = line["_id"]
                 close = line["close"]
                 continue;
+            if  line["_id"] in dict_y_bonus:
+                print('标存在分红日:',line["_id"],'涨跌剔除分红:',dict_y_bonus[line["_id"]])
+                close = close - dict_y_bonus[line["_id"]]
             rate = (line["close"] - close)/close
             copies_num = self.getCopies(rate)
             x_doc_line = self.x_coll.find_one({"_id":line["_id"]})
