@@ -2,7 +2,7 @@ import LibMongo
 import sys
 import time
 
-class ImportFundDay():
+class ImportFund():
     def filelines(file) :
         '''
             开头2行是说明，结束行是备注，中间均是内容行
@@ -30,24 +30,20 @@ if __name__=="__main__" :
     print(mongo_client)
 
     mongo_db = mongo_client["test"]
-    mycol = mongo_db["day_"+fund_name]
+    mycol = mongo_db["bonus_"+fund_name]
     x = mycol.delete_many({})
     print("请空文档",x.deleted_count, "个文档已删除")
 
-    funddayfile = "./data/33#"+fund_name+".txt"
-    list_of_all_the_lines = ImportFundDay.filelines(funddayfile)
+    funddayfile = "./data/b#"+fund_name+".txt"
+    list_of_all_the_lines = ImportFund.filelines(funddayfile)
     many_lines=[]
     for line in list_of_all_the_lines :
         list_line = line.split()
         print(list_line)
         dict_line = {}
-        dict_line['_id']=ImportFundDay.datess(list_line[0])
-        dict_line['open']=float(list_line[1])
-        dict_line['high']=float(list_line[2])
-        dict_line['low']=float(list_line[3])
-        dict_line['close']=float(list_line[4])
-        dict_line['volume']=float(list_line[5])
-        dict_line['amount']=float(list_line[6])
+        dict_line['_id']=ImportFund.datess(list_line[0])
+        dict_line['bonus']=float(list_line[1])
+        dict_line['getday']=ImportFund.datess(list_line[2])
         print(dict_line)
         many_lines.append(dict_line)
     xx = mycol.insert_many(many_lines)

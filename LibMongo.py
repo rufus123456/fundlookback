@@ -8,7 +8,7 @@ class LibMongo():
         self.dbname = None
         self.colname = None
         self.mydb = None
-        self.mycoll
+        self.mycoll = None
     def connection(self):
         if (self.myclient!=None) or (not self.myclient) :
             self.myclient = pymongo.MongoClient(self.myip,int(self.myport))
