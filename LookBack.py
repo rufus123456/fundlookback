@@ -11,6 +11,7 @@ class LookBack():
         self.db = self.mongo_client[dbname]
     def setCode(self,y_code,x_code):
         ''' 载入2个比较的股票代码 '''
+        self.x_code = x_code
         self.y_coll = self.db['day_'+y_code]
         self.yb_coll = self.db['bonus_'+y_code]
         self.x_coll = self.db['day_'+x_code]
@@ -58,6 +59,12 @@ class LookBack():
             copies_num = self.getCopies(rate)
             x_doc_line = self.x_coll.find_one({"_id":line["_id"]})
 
+            if x_doc_line==None:
+                print('基金不开盘')
+                day_ss = line["_id"]
+                close = line["close"]
+                continue;
+
             dict_line = {}
             dict_line['_id'] = line["_id"]
             dict_line['300_close'] = line["close"]
@@ -83,16 +90,16 @@ class LookBack():
             fund_close = dict_line['close']
             day_ss = line["_id"]
             close = line["close"]
-        print('基金总份数:',fund_copies,'涨幅:',round((round(fund_copies,2)*fund_close-total_amt)/total_amt,4))
+        print('以沪深300跌幅智能定投份数,每份:',copy_amt,'基金:',self.x_code,'开始时间:',start_day,'结束时间:',end_day,'基金总份数:',fund_copies,'涨幅:',round((round(fund_copies,2)*fund_close-total_amt)/total_amt,4))
 
 def main():
     mongo_ip='127.0.0.1'
     mongo_port=27017
-    y_code = sys.argv[1]
-    x_code = sys.argv[2]
-    start_day = sys.argv[3]
-    end_day = sys.argv[4]
-    copy_amt = int(sys.argv[5])
+    y_code = 'hs300'
+    x_code = sys.argv[1]
+    start_day = sys.argv[2]
+    end_day = sys.argv[3]
+    copy_amt = int(sys.argv[4])
 
     loolback = LookBack(mongo_ip,mongo_port)
     loolback.setDb("test")
@@ -100,5 +107,8 @@ def main():
     loolback.process(start_day,end_day,copy_amt)
 
 if __name__ == '__main__':
-    ''' app.py y_code x_code start_day end_day copy_amt '''
+    ''' 
+        app.py  x_code start_day end_day copy_amt
+        以沪深300跌幅计算买入份数
+     '''
     main()

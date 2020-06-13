@@ -5,3 +5,4 @@ python3  mongoDB
   * ImportFundBonus.py 导入基金分红
   * ImportFundDay.py 导入基金/股票 日交易记录
   * LookBack.py 回溯-规则1
+  * FixedLookBack.py 回溯-规则2
