@@ -1,1 +1,6 @@
 __pycache__
+*.txt
+*.xlsx
+*.xls
+data/*.xlsx
+data/*.xls
