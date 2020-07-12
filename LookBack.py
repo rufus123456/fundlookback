@@ -8,6 +8,9 @@ class LookBack():
         self.mongo = LibMongo.LibMongo(ip,port)
         self.mongo_client = self.mongo.connection()
         self.rise_num = 0
+        self.total_copies_num = 0
+        self.last_day = -1
+        self.today = -1
 
     def setDb(self,dbname):
         ''' 载入database '''
@@ -142,6 +145,7 @@ class LookBack():
             return self.getCopies13(rate)
         else:
             return self.getCopies4(rate)
+        # 月度定投、周定投
 
     def getBonus(self,coll,start_day,end_day):
         xb_doc = coll.find({"_id":{'$gte':start_day,'$lte':end_day}})

@@ -4,3 +4,4 @@ __pycache__
 *.xls
 data/*.xlsx
 data/*.xls
+*.csv
