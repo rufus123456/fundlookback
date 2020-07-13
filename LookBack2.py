@@ -42,111 +42,6 @@ class LookBack():
         else:
             self.rate = 0
         return self.rate
-    def getCopies11(self,rate):
-        ''' 计算跌幅索取份数
-            <=-0.005,>-0.015 = 1份
-            <=-0.015,>-0.025 = 2份
-            <=-0.025,>-0.035 = 3份
-            <=-0.035,>-0.045 = 4份
-            <=-0.045,>-0.055 = 5份
-            <=-0.055         = 6份
-            ……
-            连涨5天，第5天买一手
-        '''
-        if rate<=0 :
-            self.rate = abs(int(round(rate-0.0001,2)*100))
-            self.rise_num = 0
-        else:
-            self.rate = 0
-            self.rise_num = self.rise_num + 1
-            if self.rise_num/5 >=1 :
-                #print("连涨",self.rise_num)
-                self.rate = 1
-        return self.rate
-    def getCopies12(self,rate):
-        ''' 计算跌幅索取份数
-            <=-0.005,>-0.015 = 1份
-            <=-0.015,>-0.025 = 2份
-            <=-0.025,>-0.035 = 3份
-            <=-0.035,>-0.045 = 4份
-            <=-0.045,>-0.055 = 5份
-            <=-0.055,>-0.065 = 6份
-            ……
-            连涨5天，从第6天开始 <=0.005, >-0.005 = 1份
-        '''
-        if rate<=0 :
-            self.rate = abs(int(round(rate-0.0001,2)*100))
-            if self.rise_num>=6 and rate>-0.005 and self.rate==0:
-                #print("连涨",self.rise_num,rate)
-                self.rate = 1
-            self.rise_num = 0
-        else:
-            self.rate = 0
-            if self.rise_num>=6 and rate<=0.005:
-                #print("连涨",self.rise_num,rate)
-                self.rate = 1
-            self.rise_num = self.rise_num + 1
-        return self.rate
-    def getCopies13(self,rate):
-        ''' 计算跌幅索取份数
-            <=0.005, >-0.005 = 1份
-            <=-0.005,>-0.015 = 1份
-            <=-0.015,>-0.025 = 2份
-            <=-0.025,>-0.035 = 3份
-            <=-0.035,>-0.045 = 4份
-            <=-0.045,>-0.055 = 5份
-            <=-0.055,>-0.065 = 6份
-            ……
-        '''
-        if rate<=-0.005 :
-            self.rate = abs(int(round(rate-0.0001,2)*100))
-        elif rate>-0.005 and rate<=0.005:
-            self.rate = 1
-        else:
-            self.rate = 0 
-        return self.rate
-    def getCopies4(self,rate):
-        ''' 计算跌幅索取份数
-            <=-0.005,>-0.015 = 1份
-            <=-0.015,>-0.025 = 3份
-            <=-0.025,>-0.035 = 5份
-            <=-0.035,>-0.045 = 7份
-            <=-0.045,>-0.055 = 8份
-            <=-0.055,>-0.065 = 10份
-            ……
-        '''
-        if rate<=0 :
-            rate = rate-0.0001
-            if rate<=-0.005 and rate>-0.015 :
-                return 1
-            elif rate<=-0.015 and rate>-0.025 :
-                return 3
-            elif rate<=-0.025 and rate>-0.035 :
-                return 5
-            elif rate<=-0.035 and rate>-0.045 :
-                return 7
-            elif rate<=-0.045 and rate>-0.055 :
-                return 8
-            elif rate<=-0.055 :
-                return 10
-            else:
-                return 0
-        else:
-            self.rate = 0
-        return self.rate
-    def setmodule(self,module,rate):
-        if module==1:
-            return self.getCopies1(rate)
-        elif module==2:
-            return self.getCopies11(rate)
-        elif module==3:
-            return self.getCopies12(rate)
-        elif module==4:
-            return self.getCopies13(rate)
-        else:
-            return self.getCopies4(rate)
-        # 月度定投、周定投
-
     def getBonus(self,coll,start_day,end_day):
         xb_doc = coll.find({"_id":{'$gte':start_day,'$lte':end_day}})
         dict_line = {}
@@ -155,7 +50,7 @@ class LookBack():
         #print(dict_line)
         return dict_line
 
-    def process(self,start_day,end_day,copy_amt,module):
+    def process(self,start_day,end_day,copy_amt):
         ''' 遍历指定交易日start_day < x <= end_day，计算每日购买金额、基金份数、回溯后涨幅'''
         x = self.y_x_coll.delete_many({})
         #print("请空文档",x.deleted_count, "个文档已删除")
@@ -168,8 +63,8 @@ class LookBack():
         total_amt = 0
         count = 0
         oneweek_count = 0
-        last_copies_num = 0
         copies_num = 0
+        total_copies_num = 0
 
         dict_bonus = self.getBonus(self.xb_coll,start_day,end_day)
         dict_y_bonus = self.getBonus(self.yb_coll,start_day,end_day)
@@ -183,7 +78,7 @@ class LookBack():
                 print('标存在分红日:',line["_id"],'涨跌剔除分红:',dict_y_bonus[line["_id"]])
                 close = close - dict_y_bonus[line["_id"]]
             rate = (line["close"] - close)/close
-            copies_num = self.setmodule(module,rate)
+            copies_num = self.getCopies1(rate)
             if copies_num>0 :
                 count = count +1
             x_doc_line = self.x_coll.find_one({"_id":line["_id"]})
@@ -192,7 +87,6 @@ class LookBack():
                 print('基金不开盘')
                 day_ss = line["_id"]
                 close = line["close"]
-                last_copies_num = copies_num
                 continue;
 
             dict_line = {}
@@ -200,16 +94,27 @@ class LookBack():
             dict_line['300_close'] = line["close"]
             dict_line['close'] = x_doc_line["close"]
             dict_line['rate'] = rate
-            dict_line['amt'] = copy_amt * copies_num
 
-            total_add_fund_copies = round(dict_line['amt']/x_doc_line["close"],2)
+            total_add_fund_copies = 0
             if  line["_id"] in dict_bonus:
                 print('分红日:',line["_id"],'每份分红额:',dict_bonus[line["_id"]])
                 b_total_amt = round(fund_copies,2)*dict_bonus[line["_id"]]
                 new_fund_copies = round(b_total_amt/x_doc_line["close"],2)
                 print('当前总份数:',fund_copies,'分红总额:',b_total_amt,'再投资新增份数:',new_fund_copies)
-                print('本日购买份数:',total_add_fund_copies,'本日总购买份数:',total_add_fund_copies+new_fund_copies)
+                #print('本日购买份数:',total_add_fund_copies,'本日总购买份数:',total_add_fund_copies+new_fund_copies)
                 total_add_fund_copies = total_add_fund_copies + new_fund_copies
+
+            # 最新购买总市值
+            per_total_amt = dict_line['close']*(total_copies_num+copies_num)
+            # 当前基金总市值
+            now_total_amt = dict_line['close']*fund_copies
+            if now_total_amt<per_total_amt:
+                dict_line['amt'] = per_total_amt - now_total_amt
+                copies_num = round(dict_line['amt']/copy_amt,2)
+                total_add_fund_copies = total_add_fund_copies + round(dict_line['amt']/x_doc_line["close"],2)
+            else:
+                dict_line['amt'] = 
+
 
             dict_line['fund_copies'] = total_add_fund_copies
             #print(self.y_x_coll.insert_one(dict_line))
@@ -220,7 +125,7 @@ class LookBack():
             fund_close = dict_line['close']
             day_ss = line["_id"]
             close = line["close"]
-            last_copies_num = copies_num
+            total_copies_num = total_copies_num + copies_num
         list = []
         list.append(self.x_code)
         list.append(start_day)
