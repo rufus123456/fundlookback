@@ -17,6 +17,16 @@ class LookBack():
         self.db = self.mongo_client[dbname]
     def setCVS(self,csv_writer):
         self.csv_writer = csv_writer
+        list = []
+        list.append("投资标的")
+        list.append("开始日期")
+        list.append("结束日期")
+        list.append("累计份额")
+        list.append("累计次数")
+        list.append("累计投入资金")
+        list.append("截止日市值")
+        list.append("持仓收益率")
+        self.csv_writer.writerow(list)
     def writeCVS(self,list1):
         self.csv_writer.writerow(list1)
     def setCode(self,y_code,x_code):
@@ -105,20 +115,21 @@ class LookBack():
                 total_add_fund_copies = total_add_fund_copies + new_fund_copies
 
             # 最新购买总市值
-            per_total_amt = dict_line['close']*(total_copies_num+copies_num)
+            per_total_amt = total_amt + dict_line['close']*copies_num*copy_amt
             # 当前基金总市值
             now_total_amt = dict_line['close']*fund_copies
             if now_total_amt<per_total_amt:
                 dict_line['amt'] = per_total_amt - now_total_amt
-                copies_num = round(dict_line['amt']/copy_amt,2)
+                copies_num = round(dict_line['amt']/copy_amt/dict_line['close'],2)
                 total_add_fund_copies = total_add_fund_copies + round(dict_line['amt']/x_doc_line["close"],2)
             else:
-                dict_line['amt'] = 
+                dict_line['amt'] = 0
+                copies_num = 0
 
 
             dict_line['fund_copies'] = total_add_fund_copies
             #print(self.y_x_coll.insert_one(dict_line))
-            #print(dict_line['_id'],dict_line['300_close'],dict_line['rate'],dict_line['close'],dict_line['amt'],dict_line['fund_copies'])
+            print(dict_line['_id'],dict_line['300_close'],dict_line['rate'],dict_line['close'],dict_line['amt'],dict_line['fund_copies'],copies_num)
             fund_copies = round(fund_copies + dict_line['fund_copies'],2)
             total_amt = total_amt + dict_line['amt']
 
@@ -151,20 +162,16 @@ def main():
     csv_writer = csv.writer(out, dialect='excel')
 
     listss = []
-    listss.append({'start':'20180101','end':'20200711'})
-    listss.append({'start':'20180701','end':'20200711'})
-    listss.append({'start':'20190101','end':'20200711'})
+    listss.append({'start':'20200521','end':'20200711'})
 
-    fund_list=['hs300','110011','519732']
-    module_list=[1,5,3]
+    fund_list=['519732']
     for fund in fund_list :
         for list in listss :
-            for module in module_list:
-                loolback = LookBack(mongo_ip,mongo_port)
-                loolback.setDb("test")
-                loolback.setCVS(csv_writer)
-                loolback.setCode(y_code,fund)
-                loolback.process(list['start'],list['end'],1000,module)
+            loolback = LookBack(mongo_ip,mongo_port)
+            loolback.setDb("test")
+            loolback.setCVS(csv_writer)
+            loolback.setCode(y_code,fund)
+            loolback.process(list['start'],list['end'],1000)
         print(list['start'],list['end'])
 
 if __name__ == '__main__':
