@@ -7,16 +7,26 @@ class LookBack():
     def __init__(self,ip,port):
         self.mongo = LibMongo.LibMongo(ip,port)
         self.mongo_client = self.mongo.connection()
+        # 连涨天数
         self.rise_num = 0
+        # 购买总份数
         self.total_copies_num = 0
+        # 上一个交易日
         self.last_day = -1
         self.today = -1
+        # 购买总金额
+        self.total_amt = 0
+        # 分红日增加基金份数
+        self.bonus_add_fund_copies = 0
+        # 已购买基金总份数
+        self.total_fund_copies = 0
 
     def setDb(self,dbname):
         ''' 载入database '''
         self.db = self.mongo_client[dbname]
     def setCVS(self,csv_writer):
         self.csv_writer = csv_writer
+
     def writeCVS(self,list1):
         self.csv_writer.writerow(list1)
     def setCode(self,y_code,x_code):
@@ -147,6 +157,16 @@ class LookBack():
             return self.getCopies4(rate)
         # 月度定投、周定投
 
+    def getmodulename(self,module):
+        if module==1:
+            return "智能定投"
+        elif module==3:
+            return "智能优化6+1"
+        elif module==5:
+            return "佛系定投"
+        else:
+            return module;
+
     def getBonus(self,coll,start_day,end_day):
         xb_doc = coll.find({"_id":{'$gte':start_day,'$lte':end_day}})
         dict_line = {}
@@ -164,11 +184,8 @@ class LookBack():
         close = -1
 
         fund_close=-1
-        fund_copies = 0
-        total_amt = 0
         count = 0
         oneweek_count = 0
-        last_copies_num = 0
         copies_num = 0
 
         dict_bonus = self.getBonus(self.xb_coll,start_day,end_day)
@@ -182,54 +199,52 @@ class LookBack():
             if  line["_id"] in dict_y_bonus:
                 print('标存在分红日:',line["_id"],'涨跌剔除分红:',dict_y_bonus[line["_id"]])
                 close = close - dict_y_bonus[line["_id"]]
-            rate = (line["close"] - close)/close
-            copies_num = self.setmodule(module,rate)
-            if copies_num>0 :
-                count = count +1
-            x_doc_line = self.x_coll.find_one({"_id":line["_id"]})
 
+            x_doc_line = self.x_coll.find_one({"_id":line["_id"]})
             if x_doc_line==None:
                 print('基金不开盘')
                 day_ss = line["_id"]
                 close = line["close"]
-                last_copies_num = copies_num
                 continue;
 
+            self.bonus_add_fund_copies = 0
+            if  line["_id"] in dict_bonus:
+                print('分红日:',line["_id"],'每份分红额:',dict_bonus[line["_id"]])
+                b_total_amt = round(self.total_fund_copies,2)*dict_bonus[line["_id"]]
+                self.bonus_add_fund_copies = round(b_total_amt/x_doc_line["close"],2)
+                print('当前总份数:',self.total_fund_copies,'分红总额:',b_total_amt,'再投资新增份数:',self.bonus_add_fund_copies)
+
+            rate = (line["close"] - close)/close
+            copies_num = self.setmodule(module,rate)
+            if copies_num>0 :
+                count = count +1
             dict_line = {}
             dict_line['_id'] = line["_id"]
             dict_line['300_close'] = line["close"]
             dict_line['close'] = x_doc_line["close"]
             dict_line['rate'] = rate
             dict_line['amt'] = copy_amt * copies_num
+            dict_line['fund_copies'] = round(dict_line['amt']/x_doc_line["close"],2) + self.bonus_add_fund_copies
 
-            total_add_fund_copies = round(dict_line['amt']/x_doc_line["close"],2)
-            if  line["_id"] in dict_bonus:
-                print('分红日:',line["_id"],'每份分红额:',dict_bonus[line["_id"]])
-                b_total_amt = round(fund_copies,2)*dict_bonus[line["_id"]]
-                new_fund_copies = round(b_total_amt/x_doc_line["close"],2)
-                print('当前总份数:',fund_copies,'分红总额:',b_total_amt,'再投资新增份数:',new_fund_copies)
-                print('本日购买份数:',total_add_fund_copies,'本日总购买份数:',total_add_fund_copies+new_fund_copies)
-                total_add_fund_copies = total_add_fund_copies + new_fund_copies
-
-            dict_line['fund_copies'] = total_add_fund_copies
-            #print(self.y_x_coll.insert_one(dict_line))
             #print(dict_line['_id'],dict_line['300_close'],dict_line['rate'],dict_line['close'],dict_line['amt'],dict_line['fund_copies'])
-            fund_copies = round(fund_copies + dict_line['fund_copies'],2)
-            total_amt = total_amt + dict_line['amt']
+
+            self.total_copies_num = self.total_copies_num + copies_num
+            self.total_fund_copies = round(self.total_fund_copies + dict_line['fund_copies'],2)
+            self.total_amt = self.total_amt + dict_line['amt']
 
             fund_close = dict_line['close']
             day_ss = line["_id"]
             close = line["close"]
-            last_copies_num = copies_num
         list = []
         list.append(self.x_code)
         list.append(start_day)
         list.append(end_day)
-        list.append(fund_copies)
+        list.append(self.total_fund_copies)
         list.append(count)
-        list.append(total_amt)
-        list.append(round(fund_copies,2)*fund_close)
-        list.append(round((round(fund_copies,2)*fund_close-total_amt)/total_amt,4))
+        list.append(self.total_amt)
+        list.append(round(self.total_fund_copies,2)*fund_close)
+        list.append(round((round(self.total_fund_copies,2)*fund_close-self.total_amt)/self.total_amt,4))
+        list.append(self.getmodulename(module))
         self.writeCVS(list)
 
 def main():
@@ -244,6 +259,17 @@ def main():
 
     out = open('./LookBack.csv', 'w', newline='')
     csv_writer = csv.writer(out, dialect='excel')
+    list = []
+    list.append("投资标的")
+    list.append("开始日期")
+    list.append("结束日期")
+    list.append("累计份额")
+    list.append("累计次数")
+    list.append("累计投入资金")
+    list.append("截止日市值")
+    list.append("持仓收益率")
+    list.append("模式")
+    csv_writer.writerow(list)
 
     listss = []
     listss.append({'start':'20180101','end':'20200711'})

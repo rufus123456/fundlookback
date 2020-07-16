@@ -115,9 +115,9 @@ class LookBack():
                 total_add_fund_copies = total_add_fund_copies + new_fund_copies
 
             # 最新购买总市值
-            per_total_amt = total_amt + dict_line['close']*copies_num*copy_amt
+            per_total_amt = total_amt + copies_num*copy_amt
             # 当前基金总市值
-            now_total_amt = dict_line['close']*fund_copies
+            now_total_amt = dict_line['close']*(fund_copies+total_add_fund_copies)
             if now_total_amt<per_total_amt:
                 dict_line['amt'] = per_total_amt - now_total_amt
                 copies_num = round(dict_line['amt']/copy_amt/dict_line['close'],2)
