@@ -152,7 +152,7 @@ class LookBack():
         # 当前基金总市值
         now_total_amt = round(self.x_fund_close*(self.total_fund_copies+self.bonus_add_fund_copies),5)
         if self.get_copies_num!=0 and now_total_amt>=per_total_amt:
-            #print("超价值，不买",per_total_amt,now_total_amt)
+            print("超价值，不买",per_total_amt,now_total_amt)
         if self.get_copies_num!=0 and now_total_amt<per_total_amt:
             amt = per_total_amt - now_total_amt
             self.get_copies_num = amt/(self.copy_amt)
@@ -305,18 +305,16 @@ def main():
     list.append("模式")
     csv_writer.writerow(list)
 
-    print("交易日","沪深手盘价","沪深涨跌幅","基金净值","今日购买份数","购买总份数","目标购买总市值","","","",dict_line['amt'],
-            dict_line['fund_copies'],self.get_copies_num)
+    #print("交易日","沪深手盘价","沪深涨跌幅","基金净值","今日购买份数","购买总份数","目标购买总市值","","","",dict_line['amt'],dict_line['fund_copies'],self.get_copies_num)
     listss = []
-    listss.append({'start':'20200421','end':'20200711'})
-    #listss.append({'start':'20180101','end':'20200711'})
+    #listss.append({'start':'20200421','end':'20200711'})
+    listss.append({'start':'20180101','end':'20200711'})
     #listss.append({'start':'20180701','end':'20200711'})
     #listss.append({'start':'20190101','end':'20200711'})
 
     #fund_list=['hs300','110011','519732']
-    fund_list=['519732']
-    #module_list=[1,2,3,4,5,6]
-    module_list=[6]
+    fund_list=['110011']
+    module_list=[1,2,3,4,5,6]
     for fund in fund_list :
         for list in listss :
             for module in module_list:
