@@ -54,6 +54,7 @@ def setTitle(csv_writer):
     list.append("累计基金份数")           # 13
     list.append("今日基金总市值")         # 14
     list.append("截止至今日收益率")       # 15
+    list.append("累计投资次数")           # 16
     csv_writer.writerow(list)
 
 def getBonus(coll,start_day,end_day):
@@ -68,13 +69,21 @@ def process(csv_writer,start_day,end_day,x_code):
     dict_x_bonus = getBonus(xb_coll,start_day,end_day)
     dict_y_bonus = getBonus(yb_coll,start_day,end_day)
 
-    yesterday_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
+    yesterday_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
     yesterday_y_close = None
     for line in y_doc :
-        today_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
+        today_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
         today_list[0] = line["_id"]
         today_list[2] = x_code
         x_doc_line = x_coll.find_one({"_id":line["_id"]})
+
+        if  line["_id"] in dict_x_bonus:
+            #昨日总份数 * 每份分红额 = 分红总金额
+            b_total_amt = (yesterday_list[13] or 0)*dict_x_bonus[line["_id"]]
+            #计算分红再投资，今日可以添加总份数，累计到昨天总份数中
+            bonus_add_fund_copies = round(b_total_amt/x_doc_line["close"],2)
+            yesterday_list[13] = (yesterday_list[13] or 0) + bonus_add_fund_copies
+
         if x_doc_line!=None:
             today_list[3] = x_doc_line["close"]
             today_list[4] = yesterday_list[14] or 0.
@@ -92,7 +101,9 @@ def process(csv_writer,start_day,end_day,x_code):
             today_list[12] = 0.
             today_list[13] = (yesterday_list[13] or 0.)
             today_list[14] = (yesterday_list[14] or 0.)
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+            today_list[15] = ((yesterday_list[13] or 0.)*today_list[3] + (today_list[11] or 0.) - (yesterday_list[10] or 0.))/(yesterday_list[10] or 1.)
+            today_list[16] = (yesterday_list[16] or 0.)
+
             csv_writer.writerow(today_list)
             yesterday_list = today_list
             yesterday_y_close = line["close"]
@@ -110,7 +121,9 @@ def process(csv_writer,start_day,end_day,x_code):
             today_list[12] = 0.
             today_list[13] = (yesterday_list[13] or 0.)
             today_list[14] = today_list[3] * (yesterday_list[14] or 0.)
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+            today_list[15] = ((yesterday_list[13] or 0.)*today_list[3] + (today_list[11] or 0.) - (yesterday_list[10] or 0.))/(yesterday_list[10] or 1.)
+            today_list[16] = (yesterday_list[16] or 0.)
+
             csv_writer.writerow(today_list)
             yesterday_list = today_list
             yesterday_y_close = line["close"]
@@ -132,7 +145,9 @@ def process(csv_writer,start_day,end_day,x_code):
             today_list[12] = 0.
             today_list[13] = (yesterday_list[13] or 0.) + today_list[12]
             today_list[14] = today_list[13]*today_list[3]
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+            today_list[15] = ((yesterday_list[13] or 0.)*today_list[3] + (today_list[11] or 0.) - (yesterday_list[10] or 0.))/(yesterday_list[10] or 1.)
+            today_list[16] = (yesterday_list[16] or 0.)
+
             csv_writer.writerow(today_list)
             yesterday_list = today_list
             yesterday_y_close = line["close"]
@@ -163,7 +178,8 @@ def process(csv_writer,start_day,end_day,x_code):
 
         today_list[13] = (yesterday_list[13] or 0.) + today_list[12]
         today_list[14] = today_list[13]*today_list[3]
-        today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+        today_list[15] = ((yesterday_list[13] or 0.)*today_list[3] + (today_list[11] or 0.) - (yesterday_list[10] or 0.))/(yesterday_list[10] or 1.)
+        today_list[16] = (yesterday_list[16] or 0.) + 1
 
         csv_writer.writerow(today_list)
         yesterday_list = today_list

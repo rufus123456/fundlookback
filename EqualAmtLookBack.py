@@ -47,13 +47,11 @@ def setTitle(csv_writer):
     list.append("触发购买总份数")         # 6
     list.append("触发购买总金额")         # 7
     list.append("今日购买市值")           # 8
-    list.append("今日实际投入")           # 9
-    list.append("今日累计投入")           # 10
-    list.append("累计现金")               # 11
-    list.append("今日购买基金份数")       # 12
-    list.append("累计基金份数")           # 13
-    list.append("今日基金总市值")         # 14
-    list.append("截止至今日收益率")       # 15
+    list.append("今日购买基金份数")       # 9
+    list.append("累计基金份数")           # 10
+    list.append("今日基金总市值")         # 11
+    list.append("截止至今日收益率")       # 12
+    list.append("累计投资次数")           # 13
     csv_writer.writerow(list)
 
 def getBonus(coll,start_day,end_day):
@@ -68,16 +66,24 @@ def process(csv_writer,start_day,end_day,x_code):
     dict_x_bonus = getBonus(xb_coll,start_day,end_day)
     dict_y_bonus = getBonus(yb_coll,start_day,end_day)
 
-    yesterday_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
+    yesterday_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None]
     yesterday_y_close = None
     for line in y_doc :
-        today_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
+        today_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None]
         today_list[0] = line["_id"]
         today_list[2] = x_code
         x_doc_line = x_coll.find_one({"_id":line["_id"]})
+
+        if  line["_id"] in dict_x_bonus:
+            #昨日总份数 * 每份分红额 = 分红总金额
+            b_total_amt = (yesterday_list[10] or 0)*dict_x_bonus[line["_id"]]
+            #计算分红再投资，今日可以添加总份数，累计到昨天总份数中
+            bonus_add_fund_copies = round(b_total_amt/x_doc_line["close"],2)
+            yesterday_list[10] = (yesterday_list[10] or 0) + bonus_add_fund_copies
+
         if x_doc_line!=None:
             today_list[3] = x_doc_line["close"]
-            today_list[4] = yesterday_list[14] or 0.
+            today_list[4] = yesterday_list[11] or 0.
         else:
             ## 基金不开盘
             today_list[3] = yesterday_list[3] or 0.
@@ -89,10 +95,9 @@ def process(csv_writer,start_day,end_day,x_code):
             today_list[9] = 0.
             today_list[10] = (yesterday_list[10] or 0.)
             today_list[11] = (yesterday_list[11] or 0.)
-            today_list[12] = 0.
+            today_list[12] = ((yesterday_list[10] or 0.)*today_list[3] - (yesterday_list[7] or 0.))/(yesterday_list[7] or 1.)
             today_list[13] = (yesterday_list[13] or 0.)
-            today_list[14] = (yesterday_list[14] or 0.)
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+
             csv_writer.writerow(today_list)
             yesterday_list = today_list
             yesterday_y_close = line["close"]
@@ -107,10 +112,9 @@ def process(csv_writer,start_day,end_day,x_code):
             today_list[9] = 0.
             today_list[10] = (yesterday_list[10] or 0.)
             today_list[11] = (yesterday_list[11] or 0.)
-            today_list[12] = 0.
+            today_list[12] = ((yesterday_list[10] or 0.)*today_list[3] - (yesterday_list[7] or 0.))/(yesterday_list[7] or 1.)
             today_list[13] = (yesterday_list[13] or 0.)
-            today_list[14] = today_list[3] * (yesterday_list[14] or 0.)
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+
             csv_writer.writerow(today_list)
             yesterday_list = today_list
             yesterday_y_close = line["close"]
@@ -122,48 +126,16 @@ def process(csv_writer,start_day,end_day,x_code):
         today_list[5] = getCopies(today_list[1])
         today_list[6] = (yesterday_list[6] or 0) + today_list[5]
         today_list[7] = (yesterday_list[7] or 0.) + today_list[5] * per_copy_amt
-
+        today_list[8] = today_list[5] * per_copy_amt
+        today_list[9] = round(today_list[8]/today_list[3],2)
+        today_list[10] = (yesterday_list[10] or 0.) + today_list[9]
+        today_list[11] = today_list[10] * today_list[3]
+        today_list[12] = ((yesterday_list[10] or 0.)*today_list[3] - (yesterday_list[7] or 0.))/(yesterday_list[7] or 1.)
         # 无触发购买
         if today_list[5]<=0 :
-            today_list[8] = 0.
-            today_list[9] = 0.
-            today_list[10] = (yesterday_list[10] or 0.)
-            today_list[11] = (yesterday_list[11] or 0.)
-            today_list[12] = 0.
-            today_list[13] = (yesterday_list[13] or 0.) + today_list[12]
-            today_list[14] = today_list[13]*today_list[3]
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
-            csv_writer.writerow(today_list)
-            yesterday_list = today_list
-            yesterday_y_close = line["close"]
-            continue;
-
-        # 触发购买总市值 - 昨日持仓市值
-        balance = today_list[7] - (yesterday_list[4] or 0)
-        if balance>=0 :
-            # 判断是否从累计现金中取
-            today_list[8] = balance
-            if balance-yesterday_list[11]>=0 :
-                today_list[9] = balance-yesterday_list[11]
-                today_list[10] = (yesterday_list[10] or 0.) + today_list[9]
-                today_list[11] = 0.
-            else:
-                today_list[9] = 0.
-                today_list[10] = (yesterday_list[10] or 0.)
-                today_list[11] = yesterday_list[11] - balance
-
-            today_list[12] = round(today_list[8]/today_list[3],2)
+            today_list[13] = (yesterday_list[13] or 0.)
         else:
-            # 今日卖出
-            today_list[8] = 0.
-            today_list[9] = 0.
-            today_list[10] = (yesterday_list[10] or 0.)
-            today_list[11] = (yesterday_list[11] or 0.) + abs(balance)
-            today_list[12] = round(balance/today_list[3],2)
-
-        today_list[13] = (yesterday_list[13] or 0.) + today_list[12]
-        today_list[14] = today_list[13]*today_list[3]
-        today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+            today_list[13] = (yesterday_list[13] or 0.) + 1
 
         csv_writer.writerow(today_list)
         yesterday_list = today_list
@@ -174,7 +146,7 @@ def main():
     mongo_port=27017
     y_code = 'hs300'
 
-    out = open('./EqualValueLookBack.csv', 'w', newline='')
+    out = open('./EqualAmtLookBack.csv', 'w', newline='')
     csv_writer = csv.writer(out, dialect='excel')
     setTitle(csv_writer)
 

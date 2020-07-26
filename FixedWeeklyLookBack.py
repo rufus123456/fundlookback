@@ -21,39 +21,29 @@ def getColl(y_code,x_code):
     global xb_coll
     xb_coll = db['bonus_'+x_code]
 
-def getCopies(rate):
-    ''' 计算跌幅索取份数
-        <=-0.005,>-0.015 = 1份
-        <=-0.015,>-0.025 = 2份
-        <=-0.025,>-0.035 = 3份
-        <=-0.035,>-0.045 = 4份
-        <=-0.045,>-0.055 = 5份
-        <=-0.055,>-0.065 = 6份
-        ……
-    '''
+def getCopies(last_day,today):
+    ''' 每周定投一次 '''
     get_copies_num = 0
-    if rate<=0 :
-        get_copies_num = abs(int(round(rate-0.00001,2)*100))
+    last_day_week = datetime.strptime(last_day, "%Y%m%d").weekday()
+    today_week = datetime.strptime(today, "%Y%m%d").weekday()
+    if last_day_week>today_week :
+        get_copies_num = 1
     return get_copies_num
 
 def setTitle(csv_writer):
     list = []
     list.append("日期")                   # 0
-    list.append("沪深300涨跌幅")          # 1
-    list.append("投资标的")               # 2
-    list.append("当日基金净值")           # 3
-    list.append("昨日持仓市值")           # 4
-    list.append("触发购买份数")           # 5
-    list.append("触发购买总份数")         # 6
-    list.append("触发购买总金额")         # 7
-    list.append("今日购买市值")           # 8
-    list.append("今日实际投入")           # 9
-    list.append("今日累计投入")           # 10
-    list.append("累计现金")               # 11
-    list.append("今日购买基金份数")       # 12
-    list.append("累计基金份数")           # 13
-    list.append("今日基金总市值")         # 14
-    list.append("截止至今日收益率")       # 15
+    list.append("投资标的")               # 1
+    list.append("当日基金净值")           # 2
+    list.append("昨日持仓市值")           # 3
+    list.append("今日购买份数")           # 4
+    list.append("今日实际投入")           # 5
+    list.append("今日累计投入")           # 6
+    list.append("今日购买基金份数")       # 7
+    list.append("累计基金份数")           # 8
+    list.append("今日基金总市值")         # 9
+    list.append("截止至今日收益率")       # 10
+    list.append("累计投资次数")           # 11
     csv_writer.writerow(list)
 
 def getBonus(coll,start_day,end_day):
@@ -66,115 +56,49 @@ def getBonus(coll,start_day,end_day):
 def process(csv_writer,start_day,end_day,x_code):
     y_doc = y_coll.find({"_id":{'$gte':start_day,'$lte':end_day}})
     dict_x_bonus = getBonus(xb_coll,start_day,end_day)
-    dict_y_bonus = getBonus(yb_coll,start_day,end_day)
 
-    yesterday_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
-    yesterday_y_close = None
-    for line in y_doc :
-        today_list = [None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None]
+    yesterday_list = [None,None,None,None,None,None,None,None,None,None,None,None]
+    yesterday_x = None
+    for y_line in y_doc :
+        line = x_coll.find_one({"_id":y_line["_id"]})
+        today_list = [None,None,None,None,None,None,None,None,None,None,None,None]
         today_list[0] = line["_id"]
-        today_list[2] = x_code
-        x_doc_line = x_coll.find_one({"_id":line["_id"]})
-        if x_doc_line!=None:
-            today_list[3] = x_doc_line["close"]
-            today_list[4] = yesterday_list[14] or 0.
+        today_list[1] = x_code
+        today_list[2] = line["close"]
+        today_list[3] = (yesterday_list[9] or 0)
+
+        if  line["_id"] in dict_x_bonus:
+            #昨日总份数 * 每份分红额 = 分红总金额
+            b_total_amt = (yesterday_list[8] or 0)*dict_x_bonus[line["_id"]]
+            #计算分红再投资，今日可以添加总份数，累计到昨天总份数中
+            bonus_add_fund_copies = round(b_total_amt/line["close"],2)
+            yesterday_list[8] = (yesterday_list[8] or 0) + bonus_add_fund_copies
+
+        if yesterday_x==None :
+            ## 第一天买入一份
+            today_list[4] = 1
         else:
-            ## 基金不开盘
-            today_list[3] = yesterday_list[3] or 0.
-            today_list[4] = yesterday_list[4] or 0.
-            today_list[5] = 0
-            today_list[6] = (yesterday_list[6] or 0)
-            today_list[7] = (yesterday_list[7] or 0.)
-            today_list[8] = 0.
-            today_list[9] = 0.
-            today_list[10] = (yesterday_list[10] or 0.)
-            today_list[11] = (yesterday_list[11] or 0.)
-            today_list[12] = 0.
-            today_list[13] = (yesterday_list[13] or 0.)
-            today_list[14] = (yesterday_list[14] or 0.)
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
-            csv_writer.writerow(today_list)
-            yesterday_list = today_list
-            yesterday_y_close = line["close"]
-            continue;
+            today_list[4] = getCopies(yesterday_x,line["_id"])
 
-        if yesterday_y_close==None :
-            ## 昨日沪深300未有收盘价，无法计算涨跌幅
-            today_list[5] = 0
-            today_list[6] = (yesterday_list[6] or 0)
-            today_list[7] = (yesterday_list[7] or 0.)
-            today_list[8] = 0.
-            today_list[9] = 0.
-            today_list[10] = (yesterday_list[10] or 0.)
-            today_list[11] = (yesterday_list[11] or 0.)
-            today_list[12] = 0.
-            today_list[13] = (yesterday_list[13] or 0.)
-            today_list[14] = today_list[3] * (yesterday_list[14] or 0.)
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
-            csv_writer.writerow(today_list)
-            yesterday_list = today_list
-            yesterday_y_close = line["close"]
-            continue;
-
-        # 今日沪深300涨跌幅度
-        today_list[1] = round((line["close"] - yesterday_y_close)/yesterday_y_close,6)
-        # 触发购买份数、总份数、总金额(目标总市值)
-        today_list[5] = getCopies(today_list[1])
+        today_list[5] = today_list[4] * per_copy_amt
         today_list[6] = (yesterday_list[6] or 0) + today_list[5]
-        today_list[7] = (yesterday_list[7] or 0.) + today_list[5] * per_copy_amt
-
-        # 无触发购买
-        if today_list[5]<=0 :
-            today_list[8] = 0.
-            today_list[9] = 0.
-            today_list[10] = (yesterday_list[10] or 0.)
-            today_list[11] = (yesterday_list[11] or 0.)
-            today_list[12] = 0.
-            today_list[13] = (yesterday_list[13] or 0.) + today_list[12]
-            today_list[14] = today_list[13]*today_list[3]
-            today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
-            csv_writer.writerow(today_list)
-            yesterday_list = today_list
-            yesterday_y_close = line["close"]
-            continue;
-
-        # 触发购买总市值 - 昨日持仓市值
-        balance = today_list[7] - (yesterday_list[4] or 0)
-        if balance>=0 :
-            # 判断是否从累计现金中取
-            today_list[8] = balance
-            if balance-yesterday_list[11]>=0 :
-                today_list[9] = balance-yesterday_list[11]
-                today_list[10] = (yesterday_list[10] or 0.) + today_list[9]
-                today_list[11] = 0.
-            else:
-                today_list[9] = 0.
-                today_list[10] = (yesterday_list[10] or 0.)
-                today_list[11] = yesterday_list[11] - balance
-
-            today_list[12] = round(today_list[8]/today_list[3],2)
-        else:
-            # 今日卖出
-            today_list[8] = 0.
-            today_list[9] = 0.
-            today_list[10] = (yesterday_list[10] or 0.)
-            today_list[11] = (yesterday_list[11] or 0.) + abs(balance)
-            today_list[12] = round(balance/today_list[3],2)
-
-        today_list[13] = (yesterday_list[13] or 0.) + today_list[12]
-        today_list[14] = today_list[13]*today_list[3]
-        today_list[15] = ((today_list[14] or 0.) + (today_list[11] or 0.) - (today_list[10] or 0.))/(today_list[10] or 1.)
+        today_list[7] = round(today_list[5]/line["close"],2)
+        today_list[8] = (yesterday_list[8] or 0) + today_list[7]
+        today_list[9] = today_list[8] * line["close"]
+        today_list[10] = round(((yesterday_list[8] or 0) * line["close"] - (yesterday_list[6] or 0)) / (yesterday_list[6] or 1),5)
+        today_list[11] = (today_list[6] or 0)/per_copy_amt
 
         csv_writer.writerow(today_list)
         yesterday_list = today_list
-        yesterday_y_close = line["close"]
+        yesterday_x = line["_id"]
+
 
 def main():
     mongo_ip='127.0.0.1'
     mongo_port=27017
     y_code = 'hs300'
 
-    out = open('./EqualValueLookBack.csv', 'w', newline='')
+    out = open('./FixedWeeklyLookBack.csv', 'w', newline='')
     csv_writer = csv.writer(out, dialect='excel')
     setTitle(csv_writer)
 
@@ -195,7 +119,7 @@ def main():
 
 if __name__ == '__main__':
     '''
-        以沪深300跌幅计算买入份数
+        每个周第一个开盘日买入
     '''
 
     main()
